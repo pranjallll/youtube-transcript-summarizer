@@ -42,6 +42,13 @@ def vtt_to_text(vtt_data: str) -> str:
     return " ".join(lines)
 
 # ------------------------
+# Cached Whisper model
+# ------------------------
+@st.cache_resource
+def load_whisper_model():
+    return whisper.load_model("tiny")  # much faster for deployment
+
+# ------------------------
 # Extract transcript (captions OR Whisper)
 # ------------------------
 def extract_transcript(youtube_url: str, mode="captions", video_id=None):
@@ -54,8 +61,6 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None):
                 "subtitleslangs": ["en"],
                 "subtitlesformat": "vtt",
                 "quiet": True,
-                "nocache": True,
-                "cachedir": False,
             }
             with YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(youtube_url, download=False)
@@ -63,13 +68,13 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None):
 
                 if subs and "en" in subs:
                     sub_url = subs["en"][0]["url"]
-                    r = requests.get(sub_url)
+
+                    # fix: add headers to avoid 403
+                    headers = {"User-Agent": "Mozilla/5.0"}
+                    r = requests.get(sub_url, headers=headers, timeout=20)
                     r.raise_for_status()
-                    transcript_text = "\n".join(
-                        re.sub(r"<.*?>", "", line)
-                        for line in r.text.splitlines()
-                        if line.strip() and not line.startswith("WEBVTT") and not re.match(r"^\d+$", line)
-                    )
+
+                    transcript_text = vtt_to_text(r.text)
                     if transcript_text.strip():
                         return transcript_text
 
@@ -84,18 +89,20 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None):
                 "outtmpl": outtmpl,
                 "noplaylist": True,
                 "quiet": True,
-                "nocache": True,
-                "cachedir": False,
-                "ffmpeg_location": "/opt/homebrew/bin",
                 "postprocessors": [{
                     "key": "FFmpegExtractAudio",
                     "preferredcodec": "mp3",
-                    "preferredquality": "192",
+                    "preferredquality": "128",
                 }],
             }
 
             with YoutubeDL(ydl_opts_audio) as ydl:
                 info = ydl.extract_info(youtube_url, download=True)
+
+            # guardrail: skip very long videos (>20 min)
+            duration = info.get("duration", 0)
+            if duration and duration > 1200:
+                raise RuntimeError("Video too long for Whisper on free hosting (limit ~20 min).")
 
             vid = info.get("id") or (video_id or "unknown")
             final_audio = os.path.join(tmpdir, f"{vid}.mp3")
@@ -107,16 +114,7 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None):
                 else:
                     raise FileNotFoundError("No MP3 produced by yt-dlp in temp dir.")
 
-            try:
-                size = os.path.getsize(final_audio)
-            except Exception:
-                size = -1
-            st.caption(f"🔧 Whisper debug → tmpdir: {tmpdir} | video_id: {vid} | audio: {os.path.basename(final_audio)} | size: {size} bytes")
-
-            if size <= 0:
-                raise RuntimeError("Downloaded audio file is empty.")
-
-            model = whisper.load_model("base")
+            model = load_whisper_model()
             result = model.transcribe(final_audio, fp16=False)
             return result["text"]
 
@@ -174,19 +172,23 @@ if st.button("Get Summary"):
     if not youtube_link.strip():
         st.warning("⚠️ Please enter a valid YouTube link.")
     else:
-        if "captions" in mode:
-            selected_mode = "captions"
-        elif "whisper" in mode:
-            selected_mode = "whisper"
-        else:
-            selected_mode = "auto"
+        selected_mode = "captions" if "captions" in mode else "whisper"
 
         transcript_text = extract_transcript(youtube_link, mode=selected_mode, video_id=video_id)
         if transcript_text:
-            st.markdown(f"### 🔎 Debug: Transcript Preview for Video ID {video_id}")
-            st.write(transcript_text[:500])
+            st.markdown(f"### 🔎 Transcript Preview for Video ID {video_id}")
+            st.text_area("Transcript", transcript_text[:1000], height=300)
 
             summary = generate_gemini_summary(transcript_text, video_id)
             if summary:
                 st.markdown("## 📝 Video Summary:")
                 st.write(summary)
+ 
+     
+         
+                     
+            
+             
+         
+ 
+             
