@@ -1,0 +1,9 @@
+streamlit
+google-generativeai
+python-dotenv
+pathlib
+yt-dlp
+requests
+torch
+whisper
+youtube-transcript-api==1.2.2
