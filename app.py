@@ -13,9 +13,16 @@ import glob
 # Load environment variables
 # ------------------------
 
-if "GOOGLE_API_KEY" in st.secrets:  # deployed on Streamlit
+api_key = None
+
+# 1️⃣ Try Streamlit secrets first
+try:
     api_key = st.secrets["GOOGLE_API_KEY"]
-else:  # local development
+except Exception:
+    pass
+
+# 2️⃣ Fallback to local .env
+if not api_key:
     load_dotenv()
     api_key = os.getenv("GOOGLE_API_KEY")
 
