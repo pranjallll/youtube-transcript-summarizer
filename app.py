@@ -60,9 +60,9 @@ def vtt_to_text(vtt_data: str) -> str:
 # ------------------------
 # Cached Whisper model
 # ------------------------
-@st.cache(allow_output_mutation=True)
+@st.cache_resource
 def load_whisper_model():
-    return whisper.load_model("tiny")  # faster for deployment
+    return whisper.load_model("tiny")
 
 
 # ------------------------
