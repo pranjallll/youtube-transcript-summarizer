@@ -13,7 +13,7 @@ import glob
 # Load environment variables
 # ------------------------
 load_dotenv()
-api_key = os.getenv("GOOGLE_API_KEY")
+api_key = st.secrets["GOOGLE_API_KEY"]
 if not api_key:
     raise RuntimeError("❌ GOOGLE_API_KEY not found. Did you create a .env file?")
 genai.configure(api_key=api_key)
