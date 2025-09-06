@@ -14,7 +14,15 @@ import glob
 # Load environment variables
 # ------------------------
 load_dotenv()
-genai.configure(api_key=os.getenv("Google_API_KEY"))
+api_key = os.getenv("GOOGLE_API_KEY")
+if not api_key:
+    raise RuntimeError("❌ GOOGLE_API_KEY not found. Did you create a .env file?")
+genai.configure(api_key=api_key)
+print("Configured successfully ✅")
+
+load_dotenv()
+api_key = os.getenv("GOOGLE_API_KEY")
+print("DEBUG -> Loaded key from .env:", api_key)
 
 # ------------------------
 # Helper to extract video ID
@@ -46,14 +54,14 @@ def vtt_to_text(vtt_data: str) -> str:
 # ------------------------
 @st.cache_resource
 def load_whisper_model():
-    return whisper.load_model("tiny")  # much faster for deployment
+    return whisper.load_model("tiny")  # faster for deployment
 
 # ------------------------
 # Extract transcript (captions OR Whisper)
 # ------------------------
 def extract_transcript(youtube_url: str, mode="captions", video_id=None):
     try:
-        # ---------- 1) Try captions ----------
+        # 1) Try captions
         if mode == "captions":
             ydl_opts = {
                 "skip_download": True,
@@ -65,25 +73,19 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None):
             with YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(youtube_url, download=False)
                 subs = info.get("subtitles") or info.get("automatic_captions")
-
                 if subs and "en" in subs:
                     sub_url = subs["en"][0]["url"]
-
-                    # fix: add headers to avoid 403
                     headers = {"User-Agent": "Mozilla/5.0"}
                     r = requests.get(sub_url, headers=headers, timeout=20)
                     r.raise_for_status()
-
                     transcript_text = vtt_to_text(r.text)
                     if transcript_text.strip():
                         return transcript_text
 
-        # ---------- 2) Whisper fallback ----------
+        # 2) Whisper fallback
         st.info("⚠️ No subtitles found, transcribing audio with Whisper... (this may take a while)")
-
         with tempfile.TemporaryDirectory() as tmpdir:
             outtmpl = os.path.join(tmpdir, "%(id)s.%(ext)s")
-
             ydl_opts_audio = {
                 "format": "bestaudio/best",
                 "outtmpl": outtmpl,
@@ -95,25 +97,19 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None):
                     "preferredquality": "128",
                 }],
             }
-
             with YoutubeDL(ydl_opts_audio) as ydl:
                 info = ydl.extract_info(youtube_url, download=True)
-
-            # guardrail: skip very long videos (>20 min)
             duration = info.get("duration", 0)
             if duration and duration > 1200:
-                raise RuntimeError("Video too long for Whisper on free hosting (limit ~20 min).")
-
+                raise RuntimeError("Video too long for Whisper (limit ~20 min).")
             vid = info.get("id") or (video_id or "unknown")
             final_audio = os.path.join(tmpdir, f"{vid}.mp3")
-
             if not os.path.exists(final_audio):
                 mp3_candidates = glob.glob(os.path.join(tmpdir, "*.mp3"))
                 if mp3_candidates:
                     final_audio = max(mp3_candidates, key=os.path.getmtime)
                 else:
                     raise FileNotFoundError("No MP3 produced by yt-dlp in temp dir.")
-
             model = load_whisper_model()
             result = model.transcribe(final_audio, fp16=False)
             return result["text"]
@@ -128,9 +124,7 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None):
 def generate_gemini_summary(transcript_text: str, video_id: str = None):
     try:
         model = genai.GenerativeModel("gemini-1.5-flash")
-
         uniqueness_hint = transcript_text[:300]
-
         prompt = f"""
         You are a YouTube video summarizer. 
         Summarize the following transcript in under 500 words.
@@ -142,12 +136,12 @@ def generate_gemini_summary(transcript_text: str, video_id: str = None):
         Transcript:
         {transcript_text}
         """
-
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
         st.error(f"⚠️ Failed to generate summary: {e}")
         return None
+
 
 # ------------------------
 # Streamlit UI
@@ -155,40 +149,23 @@ def generate_gemini_summary(transcript_text: str, video_id: str = None):
 st.title("🎥 YouTube Transcript to Summary Converter")
 
 youtube_link = st.text_input("Enter YouTube Video Link:")
+mode = st.radio("Select transcript method:", ["captions (fast, may fail)", "whisper (slow, reliable)"], index=0)
 
-mode = st.radio(
-    "Select transcript method:",
-    ["captions (fast, may fail)", "whisper (slow, reliable)"],
-    index=0
-)
-
-video_id = None
-if youtube_link:
-    video_id = get_video_id(youtube_link)
-    if video_id:
-        st.image(f"http://img.youtube.com/vi/{video_id}/0.jpg", use_container_width=True)
+video_id = get_video_id(youtube_link) if youtube_link else None
+if video_id:
+    st.image(f"http://img.youtube.com/vi/{video_id}/0.jpg", use_container_width=True)
 
 if st.button("Get Summary"):
     if not youtube_link.strip():
         st.warning("⚠️ Please enter a valid YouTube link.")
     else:
         selected_mode = "captions" if "captions" in mode else "whisper"
-
         transcript_text = extract_transcript(youtube_link, mode=selected_mode, video_id=video_id)
         if transcript_text:
             st.markdown(f"### 🔎 Transcript Preview for Video ID {video_id}")
             st.text_area("Transcript", transcript_text[:1000], height=300)
-
             summary = generate_gemini_summary(transcript_text, video_id)
             if summary:
                 st.markdown("## 📝 Video Summary:")
                 st.write(summary)
- 
-     
-         
-                     
-            
-             
-         
- 
-             
+
