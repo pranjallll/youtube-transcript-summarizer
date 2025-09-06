@@ -1,4 +1,3 @@
-import streamlit as st
 from dotenv import load_dotenv
 import os
 import google.generativeai as genai
@@ -59,9 +58,12 @@ def load_whisper_model():
 # ------------------------
 # Extract transcript (captions OR Whisper)
 # ------------------------
+# ------------------------
+# Extract transcript (captions OR Whisper)
+# ------------------------
 def extract_transcript(youtube_url: str, mode="captions", video_id=None):
     try:
-        # 1) Try captions
+        # 1) Try captions with User-Agent header (fixes 403 issues)
         if mode == "captions":
             ydl_opts = {
                 "skip_download": True,
@@ -69,6 +71,7 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None):
                 "subtitleslangs": ["en"],
                 "subtitlesformat": "vtt",
                 "quiet": True,
+                "http_headers": {"User-Agent": "Mozilla/5.0"},  # ✅ Force header
             }
             with YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(youtube_url, download=False)
@@ -91,6 +94,7 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None):
                 "outtmpl": outtmpl,
                 "noplaylist": True,
                 "quiet": True,
+                "http_headers": {"User-Agent": "Mozilla/5.0"},  # ✅ also add for audio
                 "postprocessors": [{
                     "key": "FFmpegExtractAudio",
                     "preferredcodec": "mp3",
@@ -99,9 +103,11 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None):
             }
             with YoutubeDL(ydl_opts_audio) as ydl:
                 info = ydl.extract_info(youtube_url, download=True)
+
             duration = info.get("duration", 0)
             if duration and duration > 1200:
                 raise RuntimeError("Video too long for Whisper (limit ~20 min).")
+
             vid = info.get("id") or (video_id or "unknown")
             final_audio = os.path.join(tmpdir, f"{vid}.mp3")
             if not os.path.exists(final_audio):
@@ -110,6 +116,7 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None):
                     final_audio = max(mp3_candidates, key=os.path.getmtime)
                 else:
                     raise FileNotFoundError("No MP3 produced by yt-dlp in temp dir.")
+
             model = load_whisper_model()
             result = model.transcribe(final_audio, fp16=False)
             return result["text"]
@@ -168,4 +175,7 @@ if st.button("Get Summary"):
             if summary:
                 st.markdown("## 📝 Video Summary:")
                 st.write(summary)
+ 
 
+ 
+     
