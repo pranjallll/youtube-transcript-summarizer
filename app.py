@@ -1,5 +1,9 @@
-from dotenv import load_dotenv
 import os
+os.system("pip install streamlit==1.34.0")
+
+import streamlit as st
+from dotenv import load_dotenv
+
 import google.generativeai as genai
 from urllib.parse import urlparse, parse_qs
 from yt_dlp import YoutubeDL
@@ -12,7 +16,6 @@ import glob
 # ------------------------
 # Load environment variables
 # ------------------------
-
 api_key = None
 
 # 1️⃣ Try Streamlit secrets first
@@ -31,7 +34,6 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 print("Configured successfully ✅")
-
 # ------------------------
 # Helper to extract video ID
 # ------------------------
@@ -63,7 +65,6 @@ def vtt_to_text(vtt_data: str) -> str:
 @st.cache_resource
 def load_whisper_model():
     return whisper.load_model("tiny")
-
 
 # ------------------------
 # Extract transcript (captions OR Whisper)
@@ -186,6 +187,12 @@ if st.button("Get Summary"):
                 st.markdown("## 📝 Video Summary:")
                 st.write(summary)
  
-
- 
      
+ 
+ 
+                     
+            
+     
+
+          
+                 
