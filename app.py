@@ -12,16 +12,18 @@ import glob
 # ------------------------
 # Load environment variables
 # ------------------------
-load_dotenv()
-api_key = st.secrets["GOOGLE_API_KEY"]
+
+if "GOOGLE_API_KEY" in st.secrets:  # deployed on Streamlit
+    api_key = st.secrets["GOOGLE_API_KEY"]
+else:  # local development
+    load_dotenv()
+    api_key = os.getenv("GOOGLE_API_KEY")
+
 if not api_key:
-    raise RuntimeError("❌ GOOGLE_API_KEY not found. Did you create a .env file?")
+    raise RuntimeError("❌ GOOGLE_API_KEY not found. Set it in .env (local) or Streamlit secrets (deployed)")
+
 genai.configure(api_key=api_key)
 print("Configured successfully ✅")
-
-load_dotenv()
-api_key = os.getenv("GOOGLE_API_KEY")
-print("DEBUG -> Loaded key from .env:", api_key)
 
 # ------------------------
 # Helper to extract video ID
