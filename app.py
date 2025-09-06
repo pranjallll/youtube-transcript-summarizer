@@ -51,9 +51,10 @@ def vtt_to_text(vtt_data: str) -> str:
 # ------------------------
 # Cached Whisper model
 # ------------------------
-@st.cache_resource
+@st.cache(allow_output_mutation=True)
 def load_whisper_model():
     return whisper.load_model("tiny")  # faster for deployment
+
 
 # ------------------------
 # Extract transcript (captions OR Whisper)
