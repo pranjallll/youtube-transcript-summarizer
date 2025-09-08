@@ -1,0 +1,40 @@
+<<<<<<< HEAD
+__pycache__/
+.env
+*.mp3
+*.wav
+*.tmp
+.DS_Store
+venv/
+*.pyc
+=======
+ # Virtual environment
+venv/
+ENV/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Streamlit
+.streamlit/
+
+# OS files
+.DS_Store
+
+# Large data
+*.mp4
+*.mkv
+*.mp3
+*.wav
+*.flac
+*.zip
+*.tar.gz
+*.egg-info/
+>>>>>>> d6449752cb763615cf7462faa53dd6016407ce3d
+venv/
+.env
+cookies.txt
