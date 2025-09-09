@@ -70,8 +70,14 @@ def load_whisper_model():
 # ------------------------
 # Extract transcript (captions OR Whisper)
 # ------------------------
-def extract_transcript(youtube_url: str, mode="captions", video_id=None, lang="auto"):
+d# ------------------------
+# Extract transcript (captions OR Whisper)
+# ------------------------
+def extract_transcript(youtube_url: str, mode="captions", video_id=None):
     try:
+        # Path to cookies.txt next to app.py
+        cookies_path = os.path.join(os.path.dirname(__file__), "cookies.txt")
+
         # 1) Try captions
         if mode == "captions":
             ydl_opts = {
@@ -80,7 +86,7 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None, lang="a
                 "subtitleslangs": ["en"],
                 "subtitlesformat": "vtt",
                 "quiet": True,
-                "cachedir": False,
+                "cachedir": False,   # 👈 don’t reuse bad state
                 "http_headers": {
                     "User-Agent": (
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -91,9 +97,8 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None, lang="a
                 },
             }
 
-            # Load cookies.txt if exists
-            if os.path.exists("cookies.txt"):
-                ydl_opts["cookiefile"] = "cookies.txt"
+            if os.path.exists(cookies_path):
+                ydl_opts["cookiefile"] = cookies_path
 
             with YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(youtube_url, download=False)
@@ -115,11 +120,11 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None, lang="a
         with tempfile.TemporaryDirectory() as tmpdir:
             outtmpl = os.path.join(tmpdir, "%(id)s.%(ext)s")
             ydl_opts_audio = {
-                "format": "bestaudio/best",
+                "format": "140",  # m4a audio stream, usually safest
                 "outtmpl": outtmpl,
                 "noplaylist": True,
                 "quiet": True,
-                "cachedir": False,
+                "cachedir": False,   # 👈 fresh every time
                 "http_headers": {
                     "User-Agent": (
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -135,27 +140,20 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None, lang="a
                 }],
             }
 
-            if os.path.exists("cookies.txt"):
-                ydl_opts_audio["cookiefile"] = "cookies.txt"
+            if os.path.exists(cookies_path):
+                ydl_opts_audio["cookiefile"] = cookies_path
 
             with YoutubeDL(ydl_opts_audio) as ydl:
                 info = ydl.extract_info(youtube_url, download=True)
-                audio_files = glob.glob(os.path.join(tmpdir, "*.mp3"))
-                if not audio_files:
-                    raise RuntimeError("❌ No audio file downloaded")
-                audio_path = audio_files[0]
+                audio_path = glob.glob(os.path.join(tmpdir, "*.mp3"))[0]
                 model = load_whisper_model()
-
-                if lang == "auto":
-                    result = model.transcribe(audio_path)
-                else:
-                    result = model.transcribe(audio_path, language=lang)
-
+                result = model.transcribe(audio_path)
                 return result["text"]
 
     except Exception as e:
         st.error(f"⚠️ Failed to fetch transcript: {e}")
         return None
+
 
 # ------------------------
 # Gemini summary generator
@@ -189,22 +187,16 @@ st.title("🎥 YouTube Transcript to Summary Converter")
 youtube_link = st.text_input("Enter YouTube Video Link:")
 mode = st.radio("Select transcript method:", ["captions (fast, may fail)", "whisper (slow, reliable)"], index=0)
 
-lang = st.selectbox(
-    "Select transcription language (or leave as auto):",
-    ["auto", "en", "hi", "fr", "es", "de", "zh"],
-    index=0
-)
-
 video_id = get_video_id(youtube_link) if youtube_link else None
 if video_id:
-    st.image(f"http://img.youtube.com/vi/{video_id}/0.jpg")
+    st.image(f"http://img.youtube.com/vi/{video_id}/0.jpg", use_container_width=True)
 
 if st.button("Get Summary"):
     if not youtube_link.strip():
         st.warning("⚠️ Please enter a valid YouTube link.")
     else:
         selected_mode = "captions" if "captions" in mode else "whisper"
-        transcript_text = extract_transcript(youtube_link, mode=selected_mode, video_id=video_id, lang=lang)
+        transcript_text = extract_transcript(youtube_link, mode=selected_mode, video_id=video_id)
         if transcript_text:
             st.markdown(f"### 🔎 Transcript Preview for Video ID {video_id}")
             st.text_area("Transcript", transcript_text[:1000], height=300)
