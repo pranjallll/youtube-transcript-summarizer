@@ -70,7 +70,7 @@ def load_whisper_model():
 # ------------------------
 # Extract transcript (captions OR Whisper)
 # ------------------------
-def extract_transcript(youtube_url: str, mode="captions", video_id=None):
+def extract_transcript(youtube_url: str, mode="captions", video_id=None, lang="auto"):
     try:
         # 1) Try captions
         if mode == "captions":
@@ -80,7 +80,7 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None):
                 "subtitleslangs": ["en"],
                 "subtitlesformat": "vtt",
                 "quiet": True,
-                "cachedir": False,   # 👈 don’t reuse bad state
+                "cachedir": False,
                 "http_headers": {
                     "User-Agent": (
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -115,11 +115,11 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None):
         with tempfile.TemporaryDirectory() as tmpdir:
             outtmpl = os.path.join(tmpdir, "%(id)s.%(ext)s")
             ydl_opts_audio = {
-                "format": "140",  # m4a audio stream, usually safest
+                "format": "bestaudio/best",
                 "outtmpl": outtmpl,
                 "noplaylist": True,
                 "quiet": True,
-                "cachedir": False,   # 👈 fresh every time
+                "cachedir": False,
                 "http_headers": {
                     "User-Agent": (
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -140,9 +140,17 @@ def extract_transcript(youtube_url: str, mode="captions", video_id=None):
 
             with YoutubeDL(ydl_opts_audio) as ydl:
                 info = ydl.extract_info(youtube_url, download=True)
-                audio_path = glob.glob(os.path.join(tmpdir, "*.mp3"))[0]
+                audio_files = glob.glob(os.path.join(tmpdir, "*.mp3"))
+                if not audio_files:
+                    raise RuntimeError("❌ No audio file downloaded")
+                audio_path = audio_files[0]
                 model = load_whisper_model()
-                result = model.transcribe(audio_path)
+
+                if lang == "auto":
+                    result = model.transcribe(audio_path)
+                else:
+                    result = model.transcribe(audio_path, language=lang)
+
                 return result["text"]
 
     except Exception as e:
@@ -181,17 +189,22 @@ st.title("🎥 YouTube Transcript to Summary Converter")
 youtube_link = st.text_input("Enter YouTube Video Link:")
 mode = st.radio("Select transcript method:", ["captions (fast, may fail)", "whisper (slow, reliable)"], index=0)
 
+lang = st.selectbox(
+    "Select transcription language (or leave as auto):",
+    ["auto", "en", "hi", "fr", "es", "de", "zh"],
+    index=0
+)
+
 video_id = get_video_id(youtube_link) if youtube_link else None
 if video_id:
     st.image(f"http://img.youtube.com/vi/{video_id}/0.jpg")
-
 
 if st.button("Get Summary"):
     if not youtube_link.strip():
         st.warning("⚠️ Please enter a valid YouTube link.")
     else:
         selected_mode = "captions" if "captions" in mode else "whisper"
-        transcript_text = extract_transcript(youtube_link, mode=selected_mode, video_id=video_id)
+        transcript_text = extract_transcript(youtube_link, mode=selected_mode, video_id=video_id, lang=lang)
         if transcript_text:
             st.markdown(f"### 🔎 Transcript Preview for Video ID {video_id}")
             st.text_area("Transcript", transcript_text[:1000], height=300)
@@ -199,12 +212,3 @@ if st.button("Get Summary"):
             if summary:
                 st.markdown("## 📝 Video Summary:")
                 st.write(summary)
-
- 
- 
-                     
-            
-     
-
-          
-                 
