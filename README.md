@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+ 
 # youtube-transcript-summarizer
 A Streamlit app that extracts YouTube video transcripts (via captions or Whisper) and generates concise AI-powered summaries using Google Gemini.
 # 🎥 YouTube Transcript Summarizer
@@ -24,6 +24,4 @@ Clone the repository:
 ```bash
 git clone https://github.com/pranjallll/youtube-transcript-summarizer.git
 cd youtube-transcript-summarizer
-=======
-# YouTube Transcript Summarizer
->>>>>>> d6449752cb763615cf7462faa53dd6016407ce3d
+ 
