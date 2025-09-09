@@ -189,7 +189,8 @@ mode = st.radio("Select transcript method:", ["captions (fast, may fail)", "whis
 
 video_id = get_video_id(youtube_link) if youtube_link else None
 if video_id:
-    st.image(f"http://img.youtube.com/vi/{video_id}/0.jpg", use_container_width=True)
+   st.image(f"http://img.youtube.com/vi/{video_id}/0.jpg")
+
 
 if st.button("Get Summary"):
     if not youtube_link.strip():
