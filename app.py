@@ -70,7 +70,7 @@ def load_whisper_model():
 # ------------------------
 # Extract transcript (captions OR Whisper)
 # ------------------------
-d# ------------------------
+# ------------------------
 # Extract transcript (captions OR Whisper)
 # ------------------------
 def extract_transcript(youtube_url: str, mode="captions", video_id=None):
